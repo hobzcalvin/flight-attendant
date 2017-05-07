@@ -29,7 +29,7 @@ byte drugPinOrder[] = {
   21,  // 20: Opioids
   4,   // 21: Tramadol
   6,   // 22: Benzodiazepines
-  12,   // 23: MAOIs
+  12,  // 23: MAOIs
   16   // 24: SSRIs
 };
 
@@ -115,6 +115,7 @@ void setup() {
     Serial.begin(9600);
     Serial.println("HELLO WORLD!");
   }
+  randomSeed(analogRead(drugPinOrder[0]));
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(DATA_PIN, OUTPUT);
@@ -138,7 +139,7 @@ void setup() {
   FastLED.show();
   delay(500);
 
-  FastLED.setTemperature(Tungsten40W);
+  //FastLED.setTemperature(Tungsten40W);
 
   for (int i = 0; i < NUM_DRUGS; i++) {
     pinMode(drugPinOrder[i], INPUT_PULLUP);
