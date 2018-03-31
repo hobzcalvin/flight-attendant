@@ -120,7 +120,7 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   pinMode(DATA_PIN, OUTPUT);
   FastLED.addLeds<LED_SETTINGS>(leds, NUM_LEDS).setCorrection(Typical8mmPixel);
-  FastLED.setBrightness(255);
+  FastLED.setBrightness(42);
 
   fill_solid(leds, NUM_LEDS, 0xFF0000);
   digitalWrite(LED_PIN, HIGH);
