@@ -9,7 +9,7 @@ byte drugPinOrder[] = {
   18,  // 0:  LSD
   19,  // 1:  Mushrooms
   1,   // 2:  DMT
-  13,  // 3:  Mescaline
+  26,  // 3:  Mescaline
   5,   // 4:  DOx
   3,   // 5:  NBOMes
   0,   // 6:  2C-x
@@ -19,9 +19,9 @@ byte drugPinOrder[] = {
   10,  // 10: Ketamine
   9,   // 11: MXE
   15,  // 12: DXM
-  24,  // 13: Nitrous
+  25,  // 13: Nitrous
   14,  // 14: Amphetamines
-  25,  // 15: MDMA
+  24,  // 15: MDMA
   8,   // 16: Cocaine
   11,  // 17: Caffeine
   22,  // 18: Alcohol
@@ -89,7 +89,7 @@ mescaline */{ 1, 1, 1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 4, 1, 4, 2, 3, 3, 2, 5, 
 }; // UP=1, OK=2, DN=3, !=4, <3=5, X=6
 
 #define LED_PIN     13
-#define DATA_PIN    17
+#define DATA_PIN    38
 #define CHIPSET     WS2811
 #define COLOR_ORDER RGB
 #define LED_SETTINGS CHIPSET, DATA_PIN, COLOR_ORDER
@@ -206,6 +206,7 @@ void loop() {
   } else {
     fill_rainbow(leds, NUM_LEDS, (uint8_t)(millis() >> 3), 40);
   }
+  digitalWrite(LED_PIN, anyPressed);
   
   FastLED.delay(1000/FPS);
 }
