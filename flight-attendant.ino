@@ -1,4 +1,6 @@
 #include <FastLED.h>
+#include <SD.h>
+#include <SPI.h>
 #include <TimeLib.h>
 
 
@@ -95,7 +97,6 @@ mescaline */{ 1, 1, 1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 4, 1, 4, 2, 3, 3, 2, 5, 
 #define COLOR_ORDER RGB
 #define LED_SETTINGS CHIPSET, DATA_PIN, COLOR_ORDER
 
-#define FPS 100
 #define NUM_LEDS 6
 CRGB leds[NUM_LEDS];
 
@@ -109,15 +110,52 @@ CRGB indicators[7] = {
   0xFF0000
 };
 
+// SD Card Stuff
+const int chipSelect = BUILTIN_SDCARD;
+// Directory will be created on SD card if necessary
+#define DATA_DIR "flightat"
+// Bump this version if we ever start adding new columns, etc.
+#define CSV_VERSION 1
+String filename;
+// millis() of last log, used to determine time between logs (button changes)
+long lastLogMillis;
+
 #define DEBUG false
 
 void setup() {
   setSyncProvider(getTeensy3Time);
   
   Serial.begin(9600);
-  while (!Serial);
   Serial.print("Hello. The time is ");
-  digitalClockDisplay();
+  printClock(&Serial);
+  Serial.println();
+
+  if (SD.begin(chipSelect)) {
+    filename = DATA_DIR;
+    filename += '/';
+    filename += year();
+    filename += zeroPad(month(), false);
+    filename += zeroPad(day(), false);
+    filename += ".csv";
+    Serial.print("SD card initialized: ");
+    Serial.println(filename);
+    
+    if (!SD.mkdir(DATA_DIR)) {
+      Serial.print("Failed to mkdir ");
+      Serial.println(DATA_DIR);
+    }
+
+    if (!SD.exists(filename.c_str())) {
+      // File doesn't exist yet; before writing normal data,
+      // write a CSV header describing the columns.
+      writeDataHeader();
+    }
+    
+    // Set zero so we know we've never had a log before
+    lastLogMillis = 0;
+  } else {
+    Serial.println("SD card initialize failed / not present");
+  }
 
   randomSeed(analogRead(drugPinOrder[0]));
 
@@ -143,23 +181,32 @@ void setup() {
   FastLED.show();
   delay(500);
 
-  //FastLED.setTemperature(Tungsten40W);
-
   for (int i = 0; i < NUM_DRUGS; i++) {
     pinMode(drugPinOrder[i], INPUT_PULLUP);
   }
 }
 
+// Start with all drugs pressed so the first real reading is different.
+// This ensures that the first real reading is always logged.
+boolean drugsPressed[NUM_DRUGS] = { true };
+
 void loop() {
   boolean anyPressed = false;
-  boolean drugsPressed[NUM_DRUGS];
+  boolean pressChanged = false;
   byte risk = SELF;
   boolean decrease = false;
   boolean synergy = false;
   
   if (DEBUG) Serial.print("p: ");
   for (int i = 0; i < NUM_DRUGS; i++) {
-    drugsPressed[i] = !digitalRead(drugPinOrder[i]);
+    boolean pressed = !digitalRead(drugPinOrder[i]);
+    if (drugsPressed[i] != pressed) {
+      // This button's state changed.
+      // Update drugsPressed and note pressChanged=true
+      // so we log the state of the buttons.
+      drugsPressed[i] = pressed;
+      pressChanged = true;
+    }
     if (drugsPressed[i]) {
       anyPressed = true;
       if (DEBUG) {
@@ -211,8 +258,48 @@ void loop() {
     fill_rainbow(leds, NUM_LEDS, (uint8_t)(millis() >> 3), 40);
   }
   digitalWrite(LED_PIN, anyPressed);
-  
-  FastLED.delay(1000/FPS);
+
+  // SD card activity slows things down, so don't delay() here.
+  FastLED.show();
+
+  if (pressChanged) {
+    // The button state changed since last loop(). Log the current state.
+    File datafile = SD.open(filename.c_str(), FILE_WRITE);
+    if (datafile) {
+      datafile.print(CSV_VERSION);
+      datafile.print(',');
+      printClock(&datafile);
+      datafile.print(',');
+      datafile.print(lastLogMillis ? millis() - lastLogMillis : 0);
+      lastLogMillis = millis();
+      for (int i = 0; i < NUM_DRUGS; i++) {
+        datafile.print(',');
+        datafile.print(drugsPressed[i]);
+      }
+      datafile.println();
+      datafile.close();
+    } else if (DEBUG) {
+      Serial.print("Failed to open file: ");
+      Serial.println(filename);
+    }
+  }
+}
+
+void writeDataHeader() {
+  File datafile = SD.open(filename.c_str(), FILE_WRITE);
+  if (datafile) {
+    datafile.println(F(
+      "CSV Version,Date,Time,ms since last,"
+      "LSD,Mushrooms,DMT,Mescaline,DOx,"
+      "NBOMes,2C-x,2C-T-x,5-MeO-xxT,Cannabis,"
+      "Ketamine,MXE,DXM,Nitrous,Amphetamines,"
+      "MDMA,Cocaine,Caffeine,Alcohol,GHB/GBL,"
+      "Opioids,Tramadol,Benzodiazepines,MAOIs,SSRIs"));
+    datafile.close();
+    Serial.println("Wrote data header");
+  } else {
+    Serial.println("Failed to write data header");
+  }
 }
 
 
@@ -227,25 +314,38 @@ time_t getTeensy3Time() {
   return Teensy3Clock.get();
 }
 
-void digitalClockDisplay() {
-  // digital clock display of the time
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
-  Serial.print(" ");
-  Serial.print(day());
-  Serial.print(" ");
-  Serial.print(month());
-  Serial.print(" ");
-  Serial.print(year()); 
-  Serial.println(); 
+void printClock(Stream* stream) {
+  // Print the current time to the given stream in the format:
+  // YYYY-MM-DD,hh:mm:ss
+  // Comma between date and time makes for easier CSV processing.
+  stream->print(year());
+  stream->print('-');
+  stream->print(zeroPad(month(), false));
+  stream->print('-');
+  stream->print(zeroPad(day(), false));
+  stream->print(',');
+  stream->print(zeroPad(hour(), false));
+  stream->print(':');
+  stream->print(zeroPad(minute(), false));
+  stream->print(':');
+  stream->print(zeroPad(second(), false));
 }
 
-void printDigits(int digits) {
-  // utility function for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
+String zeroPad(int value, boolean thousand) {
+  // Return a string representing the given value,
+  // padding with zeroes as needed.
+  // 4-character return if thousand is true, 2-character otherwise.
+  String result = "";
+  if (thousand && value < 1000) {
+    result += '0';
+  }
+  if (thousand && value < 100) {
+    result += '0';
+  }
+  if (value < 10) {
+    result += '0';
+  }
+  result += value;
+  return result;
 }
 
