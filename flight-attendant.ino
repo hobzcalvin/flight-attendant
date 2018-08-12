@@ -1,6 +1,7 @@
 #include <FastLED.h>
 #include <SD.h>
 #include <SPI.h>
+// NOTE: To reset the time, use Examples > Time > TimeTeensy3 program
 #include <TimeLib.h>
 
 
@@ -101,7 +102,7 @@ mescaline */{ 1, 1, 1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 4, 1, 4, 2, 3, 3, 2, 5, 
 CRGB leds[NUM_LEDS];
 
 CRGB indicators[7] = {
-  0x000F00,
+  0x000000,
   0x2F00FF,
   0x00FF00,
   0x0000FF,
